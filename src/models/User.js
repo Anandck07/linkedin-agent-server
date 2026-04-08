@@ -36,6 +36,8 @@ const userSchema = new mongoose.Schema({
   linkedinRefreshToken: String,
   linkedinTokenExpiresAt: Date,
   linkedinPersonId: String,
+  resetToken: String,
+  resetTokenExpiry: Date,
   posts: [postSchema]
 }, { timestamps: true });
 
