@@ -33,20 +33,37 @@ app.get("/auth/linkedin/callback", async (req, res) => {
   try {
     const user = await User.findById(state);
     if (!user) return res.status(404).send("User not found");
-
     const tokenData = await getAccessToken(code, user.credentials);
     const profile = await getProfile(tokenData.access_token);
-
     user.linkedinAccessToken = tokenData.access_token;
     user.linkedinRefreshToken = tokenData.refresh_token || user.linkedinRefreshToken;
     if (tokenData.expires_in)
       user.linkedinTokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
     user.linkedinPersonId = profile.sub;
     await user.save();
-
     res.redirect(`${FRONTEND_URL}/dashboard?linkedin=connected`);
   } catch (err) {
     res.redirect(`${FRONTEND_URL}/dashboard?linkedin=error`);
+  }
+});
+
+// Frontend-initiated LinkedIn code exchange
+app.post("/auth/linkedin/exchange", async (req, res) => {
+  const { code, state } = req.body;
+  try {
+    const user = await User.findById(state);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const tokenData = await getAccessToken(code, user.credentials);
+    const profile = await getProfile(tokenData.access_token);
+    user.linkedinAccessToken = tokenData.access_token;
+    user.linkedinRefreshToken = tokenData.refresh_token || user.linkedinRefreshToken;
+    if (tokenData.expires_in)
+      user.linkedinTokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+    user.linkedinPersonId = profile.sub;
+    await user.save();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
