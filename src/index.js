@@ -16,22 +16,13 @@ const BACKEND_URL  = process.env.BACKEND_URL  || "http://localhost:5000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, "../uploads");
 
-const allowedOrigins = [
-  ...FRONTEND_URL.split(",").map((url) => url.trim()).filter(Boolean),
-  "http://localhost:5173",
-  "http://127.0.0.1:5173"
-];
-
 app.use(cors({
   credentials: true,
   origin(origin, callback) {
     if (!origin) return callback(null, true);
-
-    const isLocalhostPort = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
-    if (isLocalhostPort || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
+    const isVercel = origin.endsWith(".vercel.app");
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
+    if (isVercel || isLocalhost) return callback(null, true);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   }
 }));
