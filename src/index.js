@@ -16,16 +16,7 @@ const BACKEND_URL  = process.env.BACKEND_URL  || "http://localhost:5000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, "../uploads");
 
-app.use(cors({
-  credentials: true,
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    const isVercel = origin.endsWith(".vercel.app");
-    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
-    if (isVercel || isLocalhost) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  }
-}));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 
