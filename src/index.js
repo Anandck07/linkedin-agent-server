@@ -53,6 +53,8 @@ app.post("/auth/linkedin/exchange", async (req, res) => {
   try {
     const user = await User.findById(state);
     if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user.credentials?.linkedinClientId || !user.credentials?.linkedinClientSecret)
+      return res.status(400).json({ error: "LinkedIn credentials not saved. Go to Settings and save your Client ID and Secret first." });
     const tokenData = await getAccessToken(code, user.credentials);
     const profile = await getProfile(tokenData.access_token);
     user.linkedinAccessToken = tokenData.access_token;
@@ -63,7 +65,9 @@ app.post("/auth/linkedin/exchange", async (req, res) => {
     await user.save();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const msg = err.response?.data?.error_description || err.response?.data?.message || err.message;
+    console.error("LinkedIn exchange error:", msg);
+    res.status(500).json({ error: msg });
   }
 });
 
