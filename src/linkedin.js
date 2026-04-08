@@ -3,7 +3,7 @@ import axios from "axios";
 const REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI || "https://linkedin-agent-client-git-main-anands-projects-d6093bf1.vercel.app/auth/linkedin/callback";
 
 export const getAuthUrl = ({ linkedinClientId }) =>
-  `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=openid%20profile%20w_member_social%20offline_access`;
+  `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=openid%20profile%20w_member_social`;
 
 export const getAccessToken = async (code, { linkedinClientId, linkedinClientSecret }) => {
   const { data } = await axios.post(
