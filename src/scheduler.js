@@ -119,5 +119,14 @@ export const startScheduledPostWorker = () => {
   cron.schedule("* * * * *", () => {
     processDueScheduledPosts();
   });
+
+  // Keep Render free tier alive by self-pinging every 10 minutes
+  const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:10000";
+  cron.schedule("*/10 * * * *", async () => {
+    try {
+      await fetch(`${BACKEND_URL}/ping`);
+    } catch {}
+  });
+
   console.log("Scheduled post worker started (node-cron, every minute)");
 };

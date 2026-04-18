@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import authRoutes from "./routes/auth.js";
 import dashboardRoutes from "./routes/dashboard.js";
+import billingRoutes from "./routes/billing.js";
 import { getAccessToken, getProfile } from "./linkedin.js";
 import User from "./models/User.js";
 import { startScheduledPostWorker } from "./scheduler.js";
@@ -19,6 +20,7 @@ const uploadsDir = path.resolve(__dirname, "../uploads");
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
+app.get("/ping", (_req, res) => res.send("ok"));
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
@@ -26,6 +28,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/billing", billingRoutes);
 
 // LinkedIn OAuth callback — looks up user by state (userId)
 app.get("/auth/linkedin/callback", async (req, res) => {

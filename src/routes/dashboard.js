@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Groq from "groq-sdk";
 import { protect } from "../middleware/auth.js";
+import { checkPostLimit, checkScheduleLimit } from "../middleware/limits.js";
 import User from "../models/User.js";
 import { linkedinAgent, linkedinImagePromptAgent } from "../agents.js";
 import { ensureFreshLinkedInToken, getAuthUrl, getLinkedInPostMetrics, postToLinkedIn } from "../linkedin.js";
@@ -137,7 +138,8 @@ router.get("/me", protect, async (req, res) => {
     email: user.email,
     hasCredentials: !!(c.groqApiKey && c.linkedinClientId),
     linkedinConnected: !!user.linkedinPersonId,
-    // Send masked indicators so frontend knows which fields are already saved
+    plan: user.plan || "free",
+    postsThisMonth: user.postsThisMonth || 0,
     savedFields: {
       groqApiKey:           !!c.groqApiKey,
       linkedinClientId:     !!c.linkedinClientId,
@@ -149,7 +151,7 @@ router.get("/me", protect, async (req, res) => {
 });
 
 // Generate post using user's own Groq key
-router.post("/generate", protect, async (req, res) => {
+router.post("/generate", protect, checkPostLimit, async (req, res) => {
   const { topic } = req.body;
   const user = await User.findById(req.user._id);
   if (!user.credentials?.groqApiKey)
@@ -255,7 +257,7 @@ router.post("/publish", protect, memoryUpload.single("image"), async (req, res) 
 });
 
 // Schedule a post to publish later (supports optional image upload)
-router.post("/schedule", protect, diskUpload.single("image"), async (req, res) => {
+router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image"), async (req, res) => {
   const { postId, scheduledFor, content } = req.body;
 
   if (!postId || !scheduledFor)
@@ -288,7 +290,7 @@ router.post("/schedule", protect, diskUpload.single("image"), async (req, res) =
 });
 
 // Create a brand-new scheduled post from scratch (text + optional image + datetime)
-router.post("/schedule/new", protect, diskUpload.single("image"), async (req, res) => {
+router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("image"), async (req, res) => {
   const { content, scheduledFor } = req.body;
   if (!content?.trim() || !scheduledFor)
     return res.status(400).json({ error: "content and scheduledFor are required" });

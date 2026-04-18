@@ -38,6 +38,11 @@ const userSchema = new mongoose.Schema({
   linkedinPersonId: String,
   resetToken: String,
   resetTokenExpiry: Date,
+  plan: { type: String, enum: ["free", "pro", "business"], default: "free" },
+  stripeCustomerId: String,
+  stripeSubscriptionId: String,
+  postsThisMonth: { type: Number, default: 0 },
+  billingCycleStart: { type: Date, default: Date.now },
   posts: [postSchema]
 }, { timestamps: true });
 
