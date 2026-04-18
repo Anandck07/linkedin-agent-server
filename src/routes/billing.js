@@ -4,7 +4,11 @@ import { protect } from "../middleware/auth.js";
 import User from "../models/User.js";
 
 const router = express.Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const getStripe = () => {
+  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.startsWith("sk_test_..."))
+    throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY to your .env");
+  return new Stripe(process.env.STRIPE_SECRET_KEY);
+};
 
 export const PLANS = {
   free:     { postsPerMonth: 5,  scheduledPosts: 2  },
@@ -58,6 +62,7 @@ router.post("/checkout", protect, async (req, res) => {
   if (!priceId) return res.status(400).json({ error: "priceId is required" });
 
   try {
+    const stripe = getStripe();
     const user = await User.findById(req.user._id);
     let customerId = user.stripeCustomerId;
 
@@ -87,9 +92,10 @@ router.post("/checkout", protect, async (req, res) => {
 // POST /api/billing/portal — customer billing portal (manage/cancel)
 router.post("/portal", protect, async (req, res) => {
   try {
+    const stripe = getStripe();
     const user = await User.findById(req.user._id);
     if (!user.stripeCustomerId)
-      return res.status(400).json({ error: "No billing account found." });
+      return res.status(400).json({ error: "No billing account found. Please subscribe to a plan first." });
 
     const session = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
@@ -106,6 +112,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   const sig = req.headers["stripe-signature"];
   let event;
   try {
+    const stripe = getStripe();
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -117,6 +124,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     const userId = session.metadata?.userId;
     const subscriptionId = session.subscription;
     if (userId && subscriptionId) {
+      const stripe = getStripe();
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const priceId = subscription.items.data[0]?.price?.id;
       const plan = priceId === process.env.STRIPE_BUSINESS_PRICE_ID ? "business" : "pro";
