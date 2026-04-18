@@ -1,29 +1,28 @@
 import express from "express";
-import Stripe from "stripe";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 import { protect } from "../middleware/auth.js";
 import User from "../models/User.js";
 
 const router = express.Router();
-const getStripe = () => {
-  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.startsWith("sk_test_..."))
-    throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY to your .env");
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const getRazorpay = () => {
+  if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.startsWith("rzp_test_..."))
+    throw new Error("Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env");
+  return new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
 };
 
 export const PLANS = {
-  free:     { postsPerMonth: 5,  scheduledPosts: 2  },
+  free:     { postsPerMonth: 5,        scheduledPosts: 2        },
   pro:      { postsPerMonth: Infinity, scheduledPosts: Infinity },
   business: { postsPerMonth: Infinity, scheduledPosts: Infinity },
 };
 
-// Reset monthly usage if billing cycle has passed
 export const resetUsageIfNeeded = async (user) => {
-  const now = new Date();
-  const cycleStart = new Date(user.billingCycleStart);
-  const diffDays = (now - cycleStart) / (1000 * 60 * 60 * 24);
+  const diffDays = (new Date() - new Date(user.billingCycleStart)) / (1000 * 60 * 60 * 24);
   if (diffDays >= 30) {
     user.postsThisMonth = 0;
-    user.billingCycleStart = now;
+    user.billingCycleStart = new Date();
     await user.save();
   }
 };
@@ -36,116 +35,101 @@ router.get("/plans", (_req, res) => {
         id: "free",
         name: "Free",
         price: 0,
+        currency: "INR",
         features: ["5 posts/month", "2 scheduled posts", "All 5 AI agents", "Post history"],
       },
       {
         id: "pro",
         name: "Pro",
-        price: 9,
-        priceId: process.env.STRIPE_PRO_PRICE_ID,
+        price: 749,
+        currency: "INR",
+        planId: process.env.RAZORPAY_PRO_PLAN_ID,
         features: ["Unlimited posts", "Unlimited scheduling", "All 5 AI agents", "Priority support", "Analytics"],
       },
       {
         id: "business",
         name: "Business",
-        price: 29,
-        priceId: process.env.STRIPE_BUSINESS_PRICE_ID,
+        price: 2399,
+        currency: "INR",
+        planId: process.env.RAZORPAY_BUSINESS_PLAN_ID,
         features: ["Everything in Pro", "Team collaboration", "Custom branding", "Dedicated support", "API access"],
       },
     ],
   });
 });
 
-// POST /api/billing/checkout  — create Stripe checkout session
+// POST /api/billing/checkout — create Razorpay subscription
 router.post("/checkout", protect, async (req, res) => {
-  const { priceId } = req.body;
-  if (!priceId) return res.status(400).json({ error: "priceId is required" });
-
+  const { planId } = req.body;
+  if (!planId) return res.status(400).json({ error: "planId is required" });
   try {
-    const stripe = getStripe();
+    const razorpay = getRazorpay();
     const user = await User.findById(req.user._id);
-    let customerId = user.stripeCustomerId;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email: user.email, name: user.name });
-      customerId = customer.id;
-      user.stripeCustomerId = customerId;
-      await user.save();
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: "subscription",
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.FRONTEND_URL}/dashboard?upgrade=success`,
-      cancel_url:  `${process.env.FRONTEND_URL}/dashboard?upgrade=cancelled`,
-      metadata: { userId: user._id.toString() },
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: planId,
+      customer_notify: 1,
+      total_count: 12,
+      notes: { userId: user._id.toString(), email: user.email },
     });
-
-    res.json({ url: session.url });
+    user.razorpaySubscriptionId = subscription.id;
+    await user.save();
+    res.json({
+      subscriptionId: subscription.id,
+      keyId: process.env.RAZORPAY_KEY_ID,
+      name: user.name,
+      email: user.email,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/billing/portal — customer billing portal (manage/cancel)
-router.post("/portal", protect, async (req, res) => {
+// POST /api/billing/verify — verify payment signature after checkout
+router.post("/verify", protect, async (req, res) => {
+  const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature, planType } = req.body;
   try {
-    const stripe = getStripe();
-    const user = await User.findById(req.user._id);
-    if (!user.stripeCustomerId)
-      return res.status(400).json({ error: "No billing account found. Please subscribe to a plan first." });
+    const body = razorpay_payment_id + "|" + razorpay_subscription_id;
+    const expected = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(body).digest("hex");
+    if (expected !== razorpay_signature)
+      return res.status(400).json({ error: "Payment verification failed." });
 
-    const session = await stripe.billingPortal.sessions.create({
-      customer: user.stripeCustomerId,
-      return_url: `${process.env.FRONTEND_URL}/dashboard`,
-    });
-    res.json({ url: session.url });
+    const plan = planType === "business" ? "business" : "pro";
+    await User.findByIdAndUpdate(req.user._id, { plan, razorpaySubscriptionId: razorpay_subscription_id });
+    res.json({ success: true, plan });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/billing/webhook — Stripe webhook
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  const sig = req.headers["stripe-signature"];
-  let event;
+// POST /api/billing/cancel — cancel subscription
+router.post("/cancel", protect, async (req, res) => {
   try {
-    const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    const razorpay = getRazorpay();
+    const user = await User.findById(req.user._id);
+    if (!user.razorpaySubscriptionId)
+      return res.status(400).json({ error: "No active subscription found." });
+    await razorpay.subscriptions.cancel(user.razorpaySubscriptionId);
+    user.plan = "free";
+    user.razorpaySubscriptionId = null;
+    await user.save();
+    res.json({ success: true });
   } catch (err) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    res.status(500).json({ error: err.message });
   }
+});
 
-  const session = event.data.object;
+// POST /api/billing/webhook — Razorpay webhook
+router.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
+  const sig = req.headers["x-razorpay-signature"];
+  const body = req.body;
+  const expected = crypto.createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET).update(body).digest("hex");
+  if (expected !== sig) return res.status(400).json({ error: "Invalid signature" });
 
-  if (event.type === "checkout.session.completed") {
-    const userId = session.metadata?.userId;
-    const subscriptionId = session.subscription;
-    if (userId && subscriptionId) {
-      const stripe = getStripe();
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const priceId = subscription.items.data[0]?.price?.id;
-      const plan = priceId === process.env.STRIPE_BUSINESS_PRICE_ID ? "business" : "pro";
-      await User.findByIdAndUpdate(userId, { plan, stripeSubscriptionId: subscriptionId });
-    }
+  const event = JSON.parse(body);
+  if (event.event === "subscription.cancelled" || event.event === "subscription.completed") {
+    const subId = event.payload?.subscription?.entity?.id;
+    if (subId) User.findOneAndUpdate({ razorpaySubscriptionId: subId }, { plan: "free", razorpaySubscriptionId: null }).catch(() => {});
   }
-
-  if (event.type === "customer.subscription.deleted") {
-    await User.findOneAndUpdate(
-      { stripeSubscriptionId: session.id },
-      { plan: "free", stripeSubscriptionId: null }
-    );
-  }
-
-  if (event.type === "customer.subscription.updated") {
-    const priceId = session.items?.data[0]?.price?.id;
-    const plan = priceId === process.env.STRIPE_BUSINESS_PRICE_ID ? "business"
-               : priceId === process.env.STRIPE_PRO_PRICE_ID      ? "pro" : "free";
-    await User.findOneAndUpdate({ stripeSubscriptionId: session.id }, { plan });
-  }
-
   res.json({ received: true });
 });
 

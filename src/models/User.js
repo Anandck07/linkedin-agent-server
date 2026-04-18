@@ -39,8 +39,7 @@ const userSchema = new mongoose.Schema({
   resetToken: String,
   resetTokenExpiry: Date,
   plan: { type: String, enum: ["free", "pro", "business"], default: "free" },
-  stripeCustomerId: String,
-  stripeSubscriptionId: String,
+  razorpaySubscriptionId: String,
   postsThisMonth: { type: Number, default: 0 },
   billingCycleStart: { type: Date, default: Date.now },
   posts: [postSchema]
