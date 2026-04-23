@@ -48,7 +48,12 @@ const persistMemoryUpload = async (file) => {
   return `/uploads/${path.basename(filePath)}`;
 };
 
-const getFriendlyErrorMessage = (err) => {
+// Parse scheduled time — accepts ISO string with offset (e.g. 2025-01-15T00:00:00+05:30)
+const parseScheduleTime = (str) => {
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  return d;
+};
   const apiError = err?.response?.data?.error;
   const message = apiError?.message || err?.message || "Something went wrong";
   const code = apiError?.code || err?.code;
@@ -272,9 +277,11 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
   if (!postId || !scheduledFor)
     return res.status(400).json({ error: "postId and scheduledFor are required" });
 
-  const scheduledAt = new Date(scheduledFor);
-  if (Number.isNaN(scheduledAt.getTime()))
+  const scheduledAt = parseScheduleTime(scheduledFor);
+  if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
+
+  console.log(`[Schedule] User time: ${scheduledFor} → UTC: ${scheduledAt.toISOString()} → Server now: ${new Date().toISOString()}`);
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
@@ -302,9 +309,11 @@ router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("ima
   if (!content?.trim() || !scheduledFor)
     return res.status(400).json({ error: "content and scheduledFor are required" });
 
-  const scheduledAt = new Date(scheduledFor);
-  if (Number.isNaN(scheduledAt.getTime()))
+  const scheduledAt = parseScheduleTime(scheduledFor);
+  if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
+
+  console.log(`[Schedule/New] User time: ${scheduledFor} → UTC: ${scheduledAt.toISOString()} → Server now: ${new Date().toISOString()}`);
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
