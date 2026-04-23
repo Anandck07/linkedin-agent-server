@@ -65,7 +65,6 @@ const getFriendlyErrorMessage = (err) => {
 };
 
 const validateGroqApiKey = async (apiKey) => {
-const validateGroqApiKey = async (apiKey) => {
   const groq = new Groq({ apiKey });
   await groq.models.list();
 };
