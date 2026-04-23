@@ -275,8 +275,6 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
   const scheduledAt = new Date(scheduledFor);
   if (Number.isNaN(scheduledAt.getTime()))
     return res.status(400).json({ error: "Invalid date/time format" });
-  if (scheduledAt.getTime() < Date.now() - 30000)
-    return res.status(400).json({ error: "Scheduled time is in the past. Please pick a future time." });
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
@@ -307,8 +305,6 @@ router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("ima
   const scheduledAt = new Date(scheduledFor);
   if (Number.isNaN(scheduledAt.getTime()))
     return res.status(400).json({ error: "Invalid date/time format" });
-  if (scheduledAt.getTime() < Date.now() - 30000)
-    return res.status(400).json({ error: "Scheduled time is in the past. Please pick a future time." });
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
