@@ -280,6 +280,10 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
   if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
 
+  if (scheduledAt.getTime() <= Date.now()) {
+    return res.status(400).json({ error: "Scheduled time must be in the future" });
+  }
+
   console.log(`[Schedule] User time: ${scheduledFor} → UTC: ${scheduledAt.toISOString()} → Server now: ${new Date().toISOString()}`);
 
   const user = await User.findById(req.user._id);
@@ -311,6 +315,10 @@ router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("ima
   const scheduledAt = parseScheduleTime(scheduledFor);
   if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
+
+  if (scheduledAt.getTime() <= Date.now()) {
+    return res.status(400).json({ error: "Scheduled time must be in the future" });
+  }
 
   console.log(`[Schedule/New] User time: ${scheduledFor} → UTC: ${scheduledAt.toISOString()} → Server now: ${new Date().toISOString()}`);
 
