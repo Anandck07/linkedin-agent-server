@@ -63,6 +63,9 @@ const getFriendlyErrorMessage = (err) => {
     return "Your Groq API key is invalid or expired. Please update it in Settings.";
   return message;
 };
+
+const validateGroqApiKey = async (apiKey) => {
+const validateGroqApiKey = async (apiKey) => {
   const groq = new Groq({ apiKey });
   await groq.models.list();
 };
