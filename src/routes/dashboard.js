@@ -54,18 +54,15 @@ const parseScheduleTime = (str) => {
   if (isNaN(d.getTime())) return null;
   return d;
 };
+
+const getFriendlyErrorMessage = (err) => {
   const apiError = err?.response?.data?.error;
   const message = apiError?.message || err?.message || "Something went wrong";
   const code = apiError?.code || err?.code;
-
-  if (code === "expired_api_key" || /expired api key|invalid api key/i.test(message)) {
+  if (code === "expired_api_key" || /expired api key|invalid api key/i.test(message))
     return "Your Groq API key is invalid or expired. Please update it in Settings.";
-  }
-
   return message;
 };
-
-const validateGroqApiKey = async (apiKey) => {
   const groq = new Groq({ apiKey });
   await groq.models.list();
 };
