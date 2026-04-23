@@ -8,7 +8,7 @@ import Groq from "groq-sdk";
 import { protect } from "../middleware/auth.js";
 import { checkPostLimit, checkScheduleLimit } from "../middleware/limits.js";
 import User from "../models/User.js";
-import { linkedinAgent, linkedinImagePromptAgent } from "../agents.js";
+import { linkedinAgent, linkedinImagePromptAgent, bestTimeAgent } from "../agents.js";
 import { ensureFreshLinkedInToken, getAuthUrl, getLinkedInPostMetrics, postToLinkedIn } from "../linkedin.js";
 
 const router = express.Router();
@@ -46,14 +46,6 @@ const persistMemoryUpload = async (file) => {
   const filePath = path.join(uploadsDir, `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`);
   await fsp.writeFile(filePath, file.buffer);
   return `/uploads/${path.basename(filePath)}`;
-};
-
-const normalizeScheduleTime = (scheduledAt) => {
-  const now = Date.now();
-  const ts = scheduledAt.getTime();
-
-  if (ts > now) return scheduledAt;
-  return new Date(now + 10 * 1000);
 };
 
 const getFriendlyErrorMessage = (err) => {
@@ -150,6 +142,23 @@ router.get("/me", protect, async (req, res) => {
   });
 });
 
+// Real-time Standalone Best Time to Post API
+router.get("/best-time", protect, async (req, res) => {
+  const { industry } = req.query;
+  const user = await User.findById(req.user._id);
+
+  if (!user.credentials?.groqApiKey) {
+    return res.status(400).json({ error: "Please add your Groq API key in settings" });
+  }
+
+  try {
+    const bestTime = await bestTimeAgent(user.credentials.groqApiKey, industry || "General");
+    res.json({ bestTime });
+  } catch (err) {
+    res.status(500).json({ error: getFriendlyErrorMessage(err) });
+  }
+});
+
 // Generate post using user's own Groq key
 router.post("/generate", protect, checkPostLimit, async (req, res) => {
   const { topic } = req.body;
@@ -157,11 +166,11 @@ router.post("/generate", protect, checkPostLimit, async (req, res) => {
   if (!user.credentials?.groqApiKey)
     return res.status(400).json({ error: "Please add your Groq API key in settings" });
   try {
-    const post = await linkedinAgent(topic, user.credentials.groqApiKey);
+    const { post, bestTime } = await linkedinAgent(topic, user.credentials.groqApiKey);
     // Save to history
     user.posts.unshift({ topic, content: post });
     await user.save();
-    res.json({ post, postId: user.posts[0]._id });
+    res.json({ post, bestTime, postId: user.posts[0]._id });
   } catch (err) {
     res.status(500).json({ error: getFriendlyErrorMessage(err) });
   }
@@ -178,8 +187,8 @@ router.post("/schedule/generate-from-prompt", protect, async (req, res) => {
     return res.status(400).json({ error: "Please add your Groq API key in settings" });
 
   try {
-    const post = await linkedinAgent(prompt.trim(), user.credentials.groqApiKey);
-    res.json({ post });
+    const { post, bestTime } = await linkedinAgent(prompt.trim(), user.credentials.groqApiKey);
+    res.json({ post, bestTime });
   } catch (err) {
     res.status(500).json({ error: getFriendlyErrorMessage(err) });
   }
@@ -266,8 +275,8 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
   const scheduledAt = new Date(scheduledFor);
   if (Number.isNaN(scheduledAt.getTime()))
     return res.status(400).json({ error: "Invalid date/time format" });
-
-  const normalizedAt = normalizeScheduleTime(scheduledAt);
+  if (scheduledAt.getTime() < Date.now() - 30000)
+    return res.status(400).json({ error: "Scheduled time is in the past. Please pick a future time." });
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
@@ -280,13 +289,13 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
   if (typeof content === "string" && content.trim()) postDoc.content = content.trim();
 
   postDoc.scheduleStatus = "scheduled";
-  postDoc.scheduledFor = normalizedAt;
+  postDoc.scheduledFor = scheduledAt;
   postDoc.scheduleAttempts = 0;
   postDoc.lastScheduleError = undefined;
   if (req.file?.filename) postDoc.image = `/uploads/${req.file.filename}`;
 
   await user.save();
-  res.json({ success: true, scheduledFor: normalizedAt.toISOString() });
+  res.json({ success: true, scheduledFor: scheduledAt.toISOString() });
 });
 
 // Create a brand-new scheduled post from scratch (text + optional image + datetime)
@@ -298,7 +307,8 @@ router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("ima
   const scheduledAt = new Date(scheduledFor);
   if (Number.isNaN(scheduledAt.getTime()))
     return res.status(400).json({ error: "Invalid date/time format" });
-  const normalizedAt = normalizeScheduleTime(scheduledAt);
+  if (scheduledAt.getTime() < Date.now() - 30000)
+    return res.status(400).json({ error: "Scheduled time is in the past. Please pick a future time." });
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
@@ -308,14 +318,14 @@ router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("ima
     topic: "Manual Schedule",
     content: content.trim(),
     scheduleStatus: "scheduled",
-    scheduledFor: normalizedAt,
+    scheduledFor: scheduledAt,
     scheduleAttempts: 0,
     ...(req.file?.filename && { image: `/uploads/${req.file.filename}` })
   };
 
   user.posts.unshift(newPost);
   await user.save();
-  res.json({ success: true, postId: user.posts[0]._id, scheduledFor: normalizedAt.toISOString() });
+  res.json({ success: true, postId: user.posts[0]._id, scheduledFor: scheduledAt.toISOString() });
 });
 
 // Cancel a scheduled/retrying post
