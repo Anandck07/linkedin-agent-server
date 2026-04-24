@@ -120,7 +120,7 @@ export const startScheduledPostWorker = () => {
     processDueScheduledPosts();
   });
 
-  const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:10000";
+  const BACKEND_URL = process.env.BACKEND_URL || "https://linkedin-agent-server-production.up.railway.app";
   cron.schedule("*/10 * * * *", async () => {
     try { await fetch(`${BACKEND_URL}/ping`); } catch {}
   });
