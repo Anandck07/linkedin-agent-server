@@ -17,7 +17,18 @@ const BACKEND_URL  = process.env.BACKEND_URL  || "http://localhost:5000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, "../uploads");
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    /\.vercel\.app$/,
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+app.options("*", cors());
 app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 app.get("/ping", (_req, res) => res.send("ok"));
