@@ -318,9 +318,8 @@ router.post("/schedule/new", protect, checkScheduleLimit, (req, res, next) => {
   if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
 
-  console.log(`[Schedule/New] Saved: ${scheduledAt.toISOString()} | Now: ${new Date().toISOString()}`);
-
-  user.posts.unshift(newPost);
+  const user = await User.findById(req.user._id);
+  const newPost = {
     topic: "Manual Schedule",
     content: content.trim(),
     scheduleStatus: "scheduled",
@@ -331,6 +330,7 @@ router.post("/schedule/new", protect, checkScheduleLimit, (req, res, next) => {
 
   user.posts.unshift(newPost);
   await user.save();
+  console.log(`[Schedule/New] Saved: ${scheduledAt.toISOString()} | Now: ${new Date().toISOString()}`);
   res.json({ success: true, postId: user.posts[0]._id, scheduledFor: scheduledAt.toISOString() });
 });
 
