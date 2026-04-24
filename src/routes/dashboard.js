@@ -284,9 +284,7 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
 
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
-    return res.status(401).json({ error: "Connect LinkedIn before scheduling" });
-
-  const postDoc = user.posts.id(postId);
+    return res.status(401).json({ error: "LinkedIn not connected. Please connect LinkedIn in Settings before the scheduled time." });
   if (!postDoc) return res.status(404).json({ error: "Post not found" });
   if (postDoc.postedToLinkedIn)
     return res.status(400).json({ error: "Post is already published" });
