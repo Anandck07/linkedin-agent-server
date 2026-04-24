@@ -270,7 +270,11 @@ router.post("/publish", protect, memoryUpload.single("image"), async (req, res) 
 });
 
 // Schedule a post to publish later (supports optional image upload)
-router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image"), async (req, res) => {
+router.post("/schedule", protect, checkScheduleLimit, (req, res, next) => {
+  const ct = req.headers["content-type"] || "";
+  if (ct.includes("multipart/form-data")) return diskUpload.single("image")(req, res, next);
+  next();
+}, async (req, res) => {
   const { postId, scheduledFor, content } = req.body;
 
   if (!postId || !scheduledFor)
@@ -301,7 +305,11 @@ router.post("/schedule", protect, checkScheduleLimit, diskUpload.single("image")
 });
 
 // Create a brand-new scheduled post from scratch (text + optional image + datetime)
-router.post("/schedule/new", protect, checkScheduleLimit, diskUpload.single("image"), async (req, res) => {
+router.post("/schedule/new", protect, checkScheduleLimit, (req, res, next) => {
+  const ct = req.headers["content-type"] || "";
+  if (ct.includes("multipart/form-data")) return diskUpload.single("image")(req, res, next);
+  next();
+}, async (req, res) => {
   const { content, scheduledFor } = req.body;
   if (!content?.trim() || !scheduledFor)
     return res.status(400).json({ error: "content and scheduledFor are required" });
