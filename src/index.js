@@ -22,6 +22,25 @@ app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 app.get("/ping", (_req, res) => res.send("ok"));
 
+// Debug: show server time and scheduled posts
+app.get("/debug-time", async (_req, res) => {
+  const now = new Date();
+  const users = await User.find({ "posts.scheduleStatus": "scheduled" }).select("email posts").catch(() => []);
+  const scheduled = users.flatMap(u => u.posts
+    .filter(p => p.scheduleStatus === "scheduled")
+    .map(p => ({
+      email: u.email,
+      content: p.content?.slice(0, 50),
+      scheduledFor_UTC: p.scheduledFor,
+      scheduledFor_IST: new Date(p.scheduledFor).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      serverNow_UTC: now.toISOString(),
+      serverNow_IST: now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      isDue: new Date(p.scheduledFor) <= now
+    }))
+  );
+  res.json({ serverNow_UTC: now.toISOString(), serverNow_IST: now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }), scheduled });
+});
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
