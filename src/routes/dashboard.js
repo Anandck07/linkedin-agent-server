@@ -269,14 +269,13 @@ router.post("/publish", protect, memoryUpload.single("image"), async (req, res) 
   }
 });
 
-// Schedule a post to publish later (supports optional image upload)
+// Schedule a post to publish later
 router.post("/schedule", protect, checkScheduleLimit, (req, res, next) => {
   const ct = req.headers["content-type"] || "";
   if (ct.includes("multipart/form-data")) return diskUpload.single("image")(req, res, next);
   next();
 }, async (req, res) => {
   const { postId, scheduledFor, content } = req.body;
-
   if (!postId || !scheduledFor)
     return res.status(400).json({ error: "postId and scheduledFor are required" });
 
@@ -284,11 +283,11 @@ router.post("/schedule", protect, checkScheduleLimit, (req, res, next) => {
   if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
 
-  console.log(`[Schedule] User time: ${scheduledFor} → UTC: ${scheduledAt.toISOString()} → Server now: ${new Date().toISOString()}`);
-
   const user = await User.findById(req.user._id);
   if (!user.linkedinAccessToken || !user.linkedinPersonId)
-    return res.status(401).json({ error: "LinkedIn not connected. Please connect LinkedIn in Settings before the scheduled time." });
+    return res.status(401).json({ error: "Connect LinkedIn before scheduling" });
+
+  const postDoc = user.posts.id(postId);
   if (!postDoc) return res.status(404).json({ error: "Post not found" });
   if (postDoc.postedToLinkedIn)
     return res.status(400).json({ error: "Post is already published" });
@@ -301,6 +300,7 @@ router.post("/schedule", protect, checkScheduleLimit, (req, res, next) => {
   if (req.file?.filename) postDoc.image = `/uploads/${req.file.filename}`;
 
   await user.save();
+  console.log(`[Schedule] Saved: ${scheduledAt.toISOString()} | Now: ${new Date().toISOString()}`);
   res.json({ success: true, scheduledFor: scheduledAt.toISOString() });
 });
 
@@ -318,13 +318,9 @@ router.post("/schedule/new", protect, checkScheduleLimit, (req, res, next) => {
   if (!scheduledAt)
     return res.status(400).json({ error: "Invalid date/time format" });
 
-  console.log(`[Schedule/New] User time: ${scheduledFor} → UTC: ${scheduledAt.toISOString()} → Server now: ${new Date().toISOString()}`);
+  console.log(`[Schedule/New] Saved: ${scheduledAt.toISOString()} | Now: ${new Date().toISOString()}`);
 
-  const user = await User.findById(req.user._id);
-  if (!user.linkedinAccessToken || !user.linkedinPersonId)
-    return res.status(401).json({ error: "Connect LinkedIn before scheduling" });
-
-  const newPost = {
+  user.posts.unshift(newPost);
     topic: "Manual Schedule",
     content: content.trim(),
     scheduleStatus: "scheduled",
