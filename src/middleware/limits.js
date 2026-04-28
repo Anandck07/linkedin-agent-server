@@ -122,6 +122,10 @@ export const checkAIAccess = (req, res, next) => {
 };
 
 export const requireAdmin = (req, res, next) => {
-  if (!req.user?.isAdmin) return res.status(403).json({ error: "Admin access required" });
+  const isAdmin = req.user?.isAdmin === true || req.user?.isAdmin === "true";
+  if (!isAdmin) {
+    console.warn(`[Admin] Access denied for ${req.user?.email}. isAdmin value:`, req.user?.isAdmin);
+    return res.status(403).json({ error: "Admin access required" });
+  }
   next();
 };

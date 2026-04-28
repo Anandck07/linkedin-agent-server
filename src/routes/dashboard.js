@@ -146,6 +146,7 @@ router.get("/me", protect, async (req, res) => {
     isAdmin: user.isAdmin,
     posts: user.posts
   });
+  console.log(`[/me] User: ${user.email} | isAdmin: ${user.isAdmin} (${typeof user.isAdmin})`);
 });
 
 // Real-time Standalone Best Time to Post API
