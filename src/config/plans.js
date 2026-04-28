@@ -5,7 +5,7 @@ export const PLANS = {
     postsPerMonth: 20,
     schedulesPerMonth: 0,
     peakTimingPerMonth: 0,
-    features: { scheduling: false, peakTiming: false, aiGeneration: false, analytics: false }
+    features: { scheduling: false, peakTiming: false, aiGeneration: true, analytics: "basic" }
   },
   pro: {
     name: "Pro",
@@ -13,7 +13,7 @@ export const PLANS = {
     postsPerMonth: 200,
     schedulesPerMonth: 50,
     peakTimingPerMonth: 30,
-    features: { scheduling: true, peakTiming: true, aiGeneration: true, analytics: "basic" }
+    features: { scheduling: true, peakTiming: true, aiGeneration: true, analytics: "advanced" }
   },
   premium: {
     name: "Premium",

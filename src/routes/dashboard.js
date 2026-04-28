@@ -143,6 +143,7 @@ router.get("/me", protect, async (req, res) => {
       linkedinClientSecret: !!c.linkedinClientSecret,
       linkedinRedirectUri:  !!c.linkedinRedirectUri,
     },
+    isAdmin: user.isAdmin,
     posts: user.posts
   });
 });
