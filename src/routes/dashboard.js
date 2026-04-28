@@ -149,6 +149,18 @@ router.get("/me", protect, async (req, res) => {
   console.log(`[/me] User: ${user.email} | isAdmin: ${user.isAdmin} (${typeof user.isAdmin})`);
 });
 
+// Temporary route to fix admin status
+router.get("/make-me-admin", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    user.isAdmin = true;
+    await user.save();
+    res.json({ success: true, message: "You are now an admin! Please refresh the dashboard." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Real-time Standalone Best Time to Post API
 router.get("/best-time", protect, checkPeakTiming, async (req, res) => {
   const { industry } = req.query;
