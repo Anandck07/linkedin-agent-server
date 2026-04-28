@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Groq from "groq-sdk";
 import { protect } from "../middleware/auth.js";
-import { checkPostLimit, checkScheduleLimit } from "../middleware/limits.js";
+import { checkPostLimit, checkScheduleLimit, checkPeakTiming } from "../middleware/limits.js";
 import User from "../models/User.js";
 import { linkedinAgent, linkedinImagePromptAgent, bestTimeAgent } from "../agents.js";
 import { ensureFreshLinkedInToken, getAuthUrl, getLinkedInPostMetrics, postToLinkedIn } from "../linkedin.js";
@@ -135,7 +135,8 @@ router.get("/me", protect, async (req, res) => {
     hasCredentials: !!(c.groqApiKey && c.linkedinClientId),
     linkedinConnected: !!user.linkedinPersonId,
     plan: user.plan || "free",
-    postsThisMonth: user.postsThisMonth || 0,
+    planExpiry: user.planExpiry || null,
+    planActive: user.plan === "free" || (user.planExpiry && new Date() < new Date(user.planExpiry)),
     savedFields: {
       groqApiKey:           !!c.groqApiKey,
       linkedinClientId:     !!c.linkedinClientId,
@@ -147,7 +148,7 @@ router.get("/me", protect, async (req, res) => {
 });
 
 // Real-time Standalone Best Time to Post API
-router.get("/best-time", protect, async (req, res) => {
+router.get("/best-time", protect, checkPeakTiming, async (req, res) => {
   const { industry } = req.query;
   const user = await User.findById(req.user._id);
 

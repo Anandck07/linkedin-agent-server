@@ -23,25 +23,24 @@ const postSchema = new mongoose.Schema({
 });
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
+  email:    { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  name: String,
+  name:     String,
+  isAdmin:  { type: Boolean, default: false },
   credentials: {
     groqApiKey: String,
     linkedinClientId: String,
     linkedinClientSecret: String,
     linkedinRedirectUri: String
   },
-  linkedinAccessToken: String,
-  linkedinRefreshToken: String,
+  linkedinAccessToken:    String,
+  linkedinRefreshToken:   String,
   linkedinTokenExpiresAt: Date,
-  linkedinPersonId: String,
-  resetToken: String,
-  resetTokenExpiry: Date,
-  plan: { type: String, enum: ["free", "pro", "business"], default: "free" },
-  razorpaySubscriptionId: String,
-  postsThisMonth: { type: Number, default: 0 },
-  billingCycleStart: { type: Date, default: Date.now },
+  linkedinPersonId:       String,
+  resetToken:             String,
+  resetTokenExpiry:       Date,
+  plan:        { type: String, enum: ["free", "pro", "premium"], default: "free" },
+  planExpiry:  Date,
   posts: [postSchema]
 }, { timestamps: true });
 
