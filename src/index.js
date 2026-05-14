@@ -25,6 +25,16 @@ app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 app.get("/ping", (_req, res) => res.send("ok"));
 
+app.get("/test-email", async (_req, res) => {
+  try {
+    const { sendMail } = await import("./utils/mailer.js");
+    await sendMail({ to: process.env.SMTP_USER || "test@resend.dev", subject: "Test", html: "<p>Test email works</p>" });
+    res.json({ success: true, message: "Email sent" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Debug endpoint
 app.get("/debug-time", async (_req, res) => {
   const now = new Date();
