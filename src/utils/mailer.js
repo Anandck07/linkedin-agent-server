@@ -1,18 +1,10 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendMail = ({ to, subject, html }) =>
-  transporter.sendMail({
-    from: `"LinkedIn AI Agent" <${process.env.SMTP_USER}>`,
+  resend.emails.send({
+    from: "LinkedIn AI Agent <onboarding@resend.dev>",
     to,
     subject,
     html
