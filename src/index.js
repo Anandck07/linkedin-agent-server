@@ -25,21 +25,7 @@ app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 app.get("/ping", (_req, res) => res.send("ok"));
 
-app.get("/test-email", async (_req, res) => {
-  try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const result = await resend.emails.send({
-      from: "LinkedIn AI Agent <onboarding@resend.dev>",
-      to: process.env.SMTP_USER,
-      subject: "Test OTP Email",
-      html: "<p>Test email works! OTP: 123456</p>"
-    });
-    res.json({ success: true, result, key_prefix: process.env.RESEND_API_KEY?.slice(0, 8) });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 // Debug endpoint
 app.get("/debug-time", async (_req, res) => {
