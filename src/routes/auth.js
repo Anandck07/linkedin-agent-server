@@ -19,7 +19,7 @@ router.post("/send-otp", async (req, res) => {
   if (!email) return res.status(400).json({ message: "Email required." });
   try {
     const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: "Email already registered." });
+    if (existing) return res.status(400).json({ message: "Email already registered. Please login instead." });
     const prev = pendingOtps.get(email);
     if (prev && Date.now() - prev.sentAt < RESEND_AFTER * 1000)
       return res.status(429).json({ message: `Wait ${RESEND_AFTER}s before resending.`, resendAfterSec: RESEND_AFTER });
