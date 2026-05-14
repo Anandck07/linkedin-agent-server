@@ -1,6 +1,6 @@
 export const PLANS = {
   free: {
-    name: "Free",
+    name: "Popular Plan",
     price: { monthly: 0, halfyearly: 0 },
     postsPerMonth: 20,
     schedulesPerMonth: 0,
